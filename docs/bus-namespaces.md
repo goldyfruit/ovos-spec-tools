@@ -12,18 +12,20 @@ and the `ovos.*` namespace the specifications define
 - `MIGRATION_MAP` + `NamespaceTranslator`: the rename map and the
   dual-emit/dedup bridge logic, both in `ovos_spec_tools/messages.py`.
 
-> **Historical: the wire bridge is removed.** `ovos-bus-client` ran
-> `NamespaceTranslator` on the receive path so a deployment could cross
-> from legacy to `ovos.*` topics without a flag day. As of
-> `ovos-bus-client` commit `f1a481d` ("drop the legacy wire compat
-> bridge"), that wiring is gone: `MessageBusClient` speaks OVOS-MSG-1
-> spec topics only, and the `emit_legacy` / `modernize` /
-> `intent_reemit_blanket` flags no longer exist (a client built with any
-> of them set raises `RuntimeError`). The sections below describe the
-> bridge mechanism for historical reference and because
-> `NamespaceTranslator` and `MIGRATION_MAP` themselves still live here as
-> pure helpers used by the spec linter and migration tooling. They are no
-> longer wired into any bus client.
+> **The wire bridge is live.** `ovos-bus-client` runs `NamespaceTranslator`
+> on the receive path so a deployment can cross from legacy to `ovos.*`
+> topics without a flag day. Both directions — legacy → `ovos.*` and
+> `ovos.*` → legacy — translate by default; the `emit_legacy` /
+> `modernize` / `intent_reemit_blanket` flags are live and in effect on
+> `dev`. `NamespaceTranslator` and `MIGRATION_MAP`, defined here in
+> `ovos_spec_tools/messages.py`, are the implementation `ovos-bus-client`
+> imports and runs.
+>
+> Removal of this bridge is scheduled, not done. The kill-switch is
+> tracked in the still-open
+> [`ovos-bus-client` PR #272](https://github.com/OpenVoiceOS/ovos-bus-client/pull/272)
+> and will land only once the fleet has upgraded — it has **not**
+> happened yet.
 
 Everything here references the spec that *owns* each topic, so a reader can
 always answer "which document made this a topic?" See the
@@ -129,15 +131,16 @@ intentionally *not* mapped:
 > producer-side adoption. The map owns only the topic rename. The two are
 > composed, never conflated.
 
-## The transparent bridge (historical): `NamespaceTranslator`
+## The transparent bridge: `NamespaceTranslator`
 
-`NamespaceTranslator` was the reference implementation of the **dual-emit
-bus bridge**. `ovos-bus-client`'s `MessageBusClient` used to delegate to
-it on the receive path; that wiring was removed in `ovos-bus-client`
-commit `f1a481d` (see the note above), so no shipped bus client runs this
-bridge today. The class remains in `ovos_spec_tools/messages.py` as a
-pure, dependency-free helper for tooling that still needs to reason about
-the legacy/spec topic pairing (linters, migration scripts).
+`NamespaceTranslator` is the reference implementation of the **dual-emit
+bus bridge**. `ovos-bus-client`'s `MessageBusClient` delegates to it on
+the receive path today, so a shipped bus client runs this bridge by
+default (see the note above). The class lives in
+`ovos_spec_tools/messages.py`; `ovos-bus-client` imports it rather than
+reimplementing the mapping, and the same class also serves tooling that
+needs to reason about the legacy/spec topic pairing (linters, migration
+scripts).
 
 ```python
 from ovos_spec_tools import NamespaceTranslator
