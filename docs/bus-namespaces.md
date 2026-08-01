@@ -6,14 +6,24 @@ and the `ovos.*` namespace the specifications define
 (`ovos.utterance.speak`, `ovos.utterance.handle`,
 `ovos.intent.handler.start`, …).
 
-`ovos-spec-tools` owns the **vocabulary** of the mapping between them and
-the **transparent bridge** that lets a deployment cross from one to the
-other without a flag day. Two things implement it, both in
-`ovos_spec_tools/messages.py`:
+`ovos-spec-tools` owns the **vocabulary** of the mapping between them:
 
 - `SpecMessage`: the enum of spec-defined `ovos.*` topics.
 - `MIGRATION_MAP` + `NamespaceTranslator`: the rename map and the
-  dual-emit/dedup bridge the bus runs on top of it.
+  dual-emit/dedup bridge logic, both in `ovos_spec_tools/messages.py`.
+
+> **Historical: the wire bridge is removed.** `ovos-bus-client` ran
+> `NamespaceTranslator` on the receive path so a deployment could cross
+> from legacy to `ovos.*` topics without a flag day. As of
+> `ovos-bus-client` commit `f1a481d` ("drop the legacy wire compat
+> bridge"), that wiring is gone: `MessageBusClient` speaks OVOS-MSG-1
+> spec topics only, and the `emit_legacy` / `modernize` /
+> `intent_reemit_blanket` flags no longer exist (a client built with any
+> of them set raises `RuntimeError`). The sections below describe the
+> bridge mechanism for historical reference and because
+> `NamespaceTranslator` and `MIGRATION_MAP` themselves still live here as
+> pure helpers used by the spec linter and migration tooling. They are no
+> longer wired into any bus client.
 
 Everything here references the spec that *owns* each topic, so a reader can
 always answer "which document made this a topic?" See the
@@ -119,16 +129,15 @@ intentionally *not* mapped:
 > producer-side adoption. The map owns only the topic rename. The two are
 > composed, never conflated.
 
-## The transparent bridge: `NamespaceTranslator`
+## The transparent bridge (historical): `NamespaceTranslator`
 
-`NamespaceTranslator` is the reference implementation of the **dual-emit
-bus bridge**. `ovos-bus-client`'s `MessageBusClient` and `ovos_utils`'
-`FakeBus` both delegate to it, so the real websocket bus and the
-test/satellite double behave identically.
-
-It is pure logic, with no I/O and no
-config, so `ovos-spec-tools` stays dependency-free. The caller reads
-env/config and passes the two direction flags in.
+`NamespaceTranslator` was the reference implementation of the **dual-emit
+bus bridge**. `ovos-bus-client`'s `MessageBusClient` used to delegate to
+it on the receive path; that wiring was removed in `ovos-bus-client`
+commit `f1a481d` (see the note above), so no shipped bus client runs this
+bridge today. The class remains in `ovos_spec_tools/messages.py` as a
+pure, dependency-free helper for tooling that still needs to reason about
+the legacy/spec topic pairing (linters, migration scripts).
 
 ```python
 from ovos_spec_tools import NamespaceTranslator
